@@ -1,19 +1,24 @@
 #!/bin/bash
 set -e
 
-source ./.ci/util.sh
-
-checkForVariable() {
-  VAR_NAME=$1
-  if [ -v "${!VAR_NAME}" ]; then
-    echo "Error: Define $1 environment variable"
-    exit 1
+function checkout_from {
+  CLONE_URL=$1
+  PROJECT=$(echo "$CLONE_URL" | sed -nE 's/.*\/(.*).git/\1/p')
+  cd ../
+  mkdir -p .ci-temp
+  cd .ci-temp
+  if [ -d "$PROJECT" ]; then
+    echo "Target project $PROJECT is already cloned, latest changes will be fetched"
+    cd "$PROJECT"
+    git fetch
+    cd ../
+  else
+    for i in 1 2 3 4 5; do git clone "$CLONE_URL" && break || sleep 15; done
   fi
+  cd ../
 }
 
-checkForVariable "READ_ONLY_TOKEN"
-
-checkout_from https://github.com/checkstyle/contribution
+checkout_from https://github.com/Rahulkhinchi03/contribution
 
 cd .ci-temp/contribution/releasenotes-builder
 mvn -e --no-transfer-progress clean compile package
@@ -31,20 +36,23 @@ else
   cd ../
 fi
 
-CS_RELEASE_VERSION=checkstyle-1.2
+CS_RELEASE_VERSION=checkstyle-1.1
 echo CS_RELEASE_VERSION="$CS_RELEASE_VERSION"
 
 cd .ci-temp/checkstyle-multiple-label
-LATEST_RELEASE_TAG=$(curl -s https://api.github.com/repos/Rahulkhinchi03/checkstyle-multiple-label/releases/latest \
-                       | jq ".tag_name")
+LATEST_RELEASE_TAG=checkstyle-1.4
 echo LATEST_RELEASE_TAG="$LATEST_RELEASE_TAG"
 
 cd ../
 
+echo remoteRepo="$REMOTE_REPO_PATH"
+echo start="$START_REF"
+echo release="$RELEASE_NUMBER"
+
 java -jar contribution/releasenotes-builder/target/releasenotes-builder-1.0-all.jar \
         -localRepoPath checkstyle-multiple-label \
-        -remoteRepoPath Rahulkhinchi03/checkstyle-multiple-label \
-        -startRef "$LATEST_RELEASE_TAG" \
-        -releaseNumber "$CS_RELEASE_VERSION" \
-        -githubAuthToken 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 \
+        -remoteRepoPath remoteRepo \
+        -startRef start \
+        -releaseNumber release \
+        -githubAuthToken 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 \
         -generateAll
